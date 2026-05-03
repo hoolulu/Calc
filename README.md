@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="#zh">🇨🇳 中文</a> · <a href="#en">🇬🇧 English</a>
+  <a href="#zh"><b>[中文]</b></a> · <a href="#en"><b>[English]</b></a>
 </p>
 
 ---
@@ -94,7 +94,7 @@
 <a name="en"></a>
 
 <p align="center">
-  <a href="#zh">🇨🇳 中文</a> · <a href="#en">🇬🇧 English</a>
+  <a href="#zh"><b>[中文]</b></a> · <a href="#en"><b>[English]</b></a>
 </p>
 
 # Hoolulu Calc v1.0
