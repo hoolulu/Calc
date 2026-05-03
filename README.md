@@ -1,3 +1,11 @@
+<p align="center">
+  <a href="#zh">🇨🇳 中文</a> · <a href="#en">🇬🇧 English</a>
+</p>
+
+---
+
+<a name="zh"></a>
+
 # Hoolulu Calc v1.0
 
 一个简洁、美观、全平台可用的计算器。单 HTML 文件，零依赖部署。
@@ -83,8 +91,13 @@
 
 ---
 
-<details>
-<summary><b>English</b></summary>
+<a name="en"></a>
+
+<p align="center">
+  <a href="#zh">🇨🇳 中文</a> · <a href="#en">🇬🇧 English</a>
+</p>
+
+# Hoolulu Calc v1.0
 
 A clean, responsive calculator that works everywhere. Single HTML file, zero dependencies.
 
@@ -166,5 +179,3 @@ Any service that serves static files works — just upload `index.html`.
 - History stored only in browser `localStorage`
 - No network requests (except CDN scripts on first load)
 - No backend, no database, no tracking
-
-</details>
