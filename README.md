@@ -80,3 +80,91 @@
 - 历史记录仅存储在浏览器 `localStorage` 中
 - 不发送任何网络请求（除加载 CDN 脚本外）
 - 无后端、无数据库、无追踪
+
+---
+
+<details>
+<summary><b>English</b></summary>
+
+A clean, responsive calculator that works everywhere. Single HTML file, zero dependencies.
+
+> 🖥️ Live demo: [https://js.p55.top](https://js.p55.top)
+
+## Features
+
+- Basic arithmetic: `+` `−` `×` `÷`
+- `%` percent, `±` negate
+- Backspace `←`, Clear `C`
+- Keyboard shortcuts (digits, operators, Enter, Backspace, Escape)
+- Calculation history (persisted in `localStorage`)
+  - Click to reload result
+  - ✏️ Edit expression & auto-recalculate
+  - 🗑 Delete single / Clear all
+- Thousands separator formatting
+- Dynamic font scaling for long numbers (up to 40 significant digits)
+- Arbitrary precision arithmetic (powered by `decimal.js`):
+  - Accurate `0.1 + 0.2 = 0.3`
+  - Exact integer operations up to 40 digits
+- Responsive layout
+  - Mobile: full-width calculator + slide-in history panel
+  - Desktop: side-by-side calculator & history
+- Dark theme
+
+## Tech Stack
+
+|              |                                                |
+| ------------ | ---------------------------------------------- |
+| Framework    | None (vanilla HTML)                            |
+| Reactive UI  | [Alpine.js](https://alpinejs.dev/)             |
+| Styling      | [Tailwind CSS](https://tailwindcss.com/) (CDN) |
+| Math Engine  | [decimal.js](https://github.com/MikeMcl/decimal.js) |
+| Persistence  | `localStorage`                                 |
+
+All dependencies loaded via CDN — no build step required.
+
+## Usage
+
+Open `index.html` in a browser, or deploy to any static hosting service.
+
+### Keyboard Shortcuts
+
+| Key          | Function    |
+| ------------ | ----------- |
+| `0` – `9`    | Digit input |
+| `.`          | Decimal point |
+| `+` `-` `*` `/` | Operator |
+| `Enter` / `=` | Calculate |
+| `Backspace`  | Backspace   |
+| `Escape` / `Delete` | Clear all |
+| `%`          | Percent     |
+
+## Deployment
+
+### GitHub Pages
+
+1. Create a repository on GitHub
+2. Push `index.html` and `README.md`
+3. Settings → Pages → Source → `main` branch
+4. (Optional) Bind a custom domain
+
+### Cloudflare Pages
+
+1. Cloudflare Dashboard → Pages
+2. Create project → Connect Git repo
+3. Build settings: Framework **None**, build command empty, output directory `.`
+4. (Optional) Bind a custom domain
+
+### Other Static Hosting
+
+Any service that serves static files works — just upload `index.html`.
+
+> **History data isolation**: `localStorage` is scoped per domain. Your data stays on your domain; fork users' data stays on theirs.
+
+## Privacy
+
+- All computation happens locally in the browser
+- History stored only in browser `localStorage`
+- No network requests (except CDN scripts on first load)
+- No backend, no database, no tracking
+
+</details>
