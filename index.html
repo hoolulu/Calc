@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hoolulu Calc v1.0</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/decimal.js@10.4.3/decimal.min.js"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    html, body { height: 100%; }
+    .btn { @apply select-none transition-all duration-75 active:scale-95 focus:outline-none; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .fade-in { animation: fadeIn 0.15s ease-out; }
+  </style>
+</head>
+<body x-data="calculator()" @keydown="handleKeydown($event)" class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white min-h-screen flex items-center justify-center p-4 font-mono outline-none" tabindex="0" x-cloak>
+
+  <div class="w-full max-w-4xl xl:max-w-5xl flex flex-col lg:flex-row gap-4 lg:gap-6">
+
+    <!-- Calculator -->
+    <div class="flex-1 min-w-0 bg-slate-900/60 backdrop-blur-xl rounded-3xl p-5 sm:p-6 shadow-2xl border border-slate-700/50" @click="$el.closest('[tabindex]').focus()">
+      <!-- Top bar -->
+      <div class="flex items-center justify-between mb-4 text-slate-400 text-sm">
+        <span class="font-sans tracking-wider text-xs">Hoolulu Calc v1.0</span>
+        <button @click="historyOpen = !historyOpen" class="lg:hidden p-2 hover:bg-slate-700/50 rounded-xl transition-colors" title="历史记录">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </button>
+      </div>
+
+      <!-- Display -->
+      <div class="mb-5 bg-slate-950/60 rounded-2xl p-4 sm:p-5 border border-slate-700/30 h-[7.25rem] sm:h-32 flex flex-col items-end justify-end overflow-hidden">
+        <div class="text-slate-400 w-full text-right h-5 sm:h-6 leading-none overflow-hidden whitespace-nowrap" :class="expressionClass" x-text="expressionDisplay || '\u00A0'"></div>
+        <div class="text-white font-light tabular-nums w-full text-right leading-tight mt-1 overflow-hidden whitespace-nowrap" :class="displayClass + (display === 'Error' ? ' text-red-400' : '')" x-text="formattedDisplay"></div>
+      </div>
+
+      <!-- Buttons -->
+      <div class="grid grid-cols-4 gap-2 sm:gap-3">
+        <template x-for="row in buttonRows" :key="row">
+          <template x-for="btn in row" :key="btn.label">
+            <button
+              @click="press(btn)"
+              :class="[
+                'btn rounded-xl font-medium text-lg sm:text-xl h-14 sm:h-16',
+                btn.action === 'number' ? 'bg-slate-700/70 hover:bg-slate-600/70 text-white' :
+                btn.action === 'operator' ? 'bg-amber-600/80 hover:bg-amber-500/80 text-white' :
+                btn.action === 'calculate' ? 'bg-amber-500 hover:bg-amber-400 text-white' :
+                btn.action === 'clear' ? 'bg-red-500/40 hover:bg-red-500/60 text-red-200' :
+                'bg-slate-600/40 hover:bg-slate-500/40 text-slate-200'
+              ]"
+              x-text="btn.label"
+            ></button>
+          </template>
+        </template>
+      </div>
+    </div>
+
+    <!-- History Panel (Desktop) -->
+    <div class="hidden lg:flex lg:w-80 xl:w-96 flex-col bg-slate-900/60 backdrop-blur-xl rounded-3xl p-5 sm:p-6 shadow-2xl border border-slate-700/50 max-h-[36rem]">
+      <div class="flex items-center justify-between mb-4 text-sm">
+        <h2 class="text-slate-300 font-sans tracking-wider text-xs uppercase">History</h2>
+        <button @click="clearHistory()" x-show="history.length > 0" class="text-xs text-slate-500 hover:text-red-400 transition-colors px-2 py-1 rounded-lg hover:bg-red-500/10">清空全部</button>
+      </div>
+      <div class="flex-1 overflow-y-auto no-scrollbar space-y-2">
+        <template x-for="item in history" :key="item.id">
+          <div class="group bg-slate-800/40 hover:bg-slate-700/40 rounded-xl p-3 transition-all cursor-pointer border border-transparent hover:border-slate-600/50 fade-in" @click="loadHistory(item)" :title="item.expression + ' = ' + item.result">
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex-1 min-w-0">
+                <template x-if="editingId !== item.id">
+                  <div>
+                    <div class="text-slate-400 text-xs truncate" x-text="item.expression"></div>
+                    <div class="text-white text-base font-medium mt-0.5 truncate" x-text="'= ' + withCommas(item.result)"></div>
+                  </div>
+                </template>
+                <template x-if="editingId === item.id">
+                  <div class="flex gap-2" @click.stop>
+                    <input type="text" x-model="editText" @keydown.enter="saveEdit(item.id)" @keydown.escape="cancelEdit()" class="flex-1 bg-slate-700/60 rounded-lg px-2 py-1 text-sm text-white border border-amber-500/50 focus:outline-none focus:border-amber-400" autofocus>
+                    <button @click="saveEdit(item.id)" class="text-amber-400 hover:text-amber-300 text-xs px-1">确定</button>
+                    <button @click="cancelEdit()" class="text-slate-500 hover:text-slate-300 text-xs px-1">取消</button>
+                  </div>
+                </template>
+              </div>
+              <div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button @click.stop="startEdit(item)" class="p-1.5 rounded-lg hover:bg-slate-600/50 text-slate-500 hover:text-amber-400 transition-colors" title="编辑">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                </button>
+                <button @click.stop="deleteHistory(item.id)" class="p-1.5 rounded-lg hover:bg-slate-600/50 text-slate-500 hover:text-red-400 transition-colors" title="删除">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </template>
+        <template x-if="history.length === 0">
+          <div class="text-center text-slate-600 text-sm py-8">暂无记录</div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- History Overlay (Mobile) -->
+  <template x-teleport="body">
+    <div x-show="historyOpen" class="fixed inset-0 z-50 lg:hidden" style="display: none;"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0">
+      <div @click="historyOpen = false" class="absolute inset-0 bg-black/60 backdrop-blur-sm"
+           x-transition:enter="transition ease-out duration-300"
+           x-transition:enter-start="opacity-0"
+           x-transition:enter-end="opacity-100"
+           x-transition:leave="transition ease-in duration-200"
+           x-transition:leave-start="opacity-100"
+           x-transition:leave-end="opacity-0"></div>
+      <div class="absolute right-0 top-0 bottom-0 w-80 max-w-[85vw] bg-slate-900 border-l border-slate-700/50 shadow-2xl p-5 flex flex-col"
+           x-transition:enter="transition ease-out duration-300"
+           x-transition:enter-start="translate-x-full"
+           x-transition:enter-end="translate-x-0"
+           x-transition:leave="transition ease-in duration-200"
+           x-transition:leave-start="translate-x-0"
+           x-transition:leave-end="translate-x-full">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-slate-300 font-sans tracking-wider text-xs uppercase">History</h2>
+          <div class="flex items-center gap-2">
+            <button @click="clearHistory()" x-show="history.length > 0" class="text-xs text-slate-500 hover:text-red-400 transition-colors px-2 py-1 rounded-lg hover:bg-red-500/10">清空全部</button>
+            <button @click="historyOpen = false" class="p-1.5 text-slate-400 hover:text-white transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="flex-1 overflow-y-auto no-scrollbar space-y-2">
+          <template x-for="item in history" :key="item.id">
+            <div class="group bg-slate-800/40 hover:bg-slate-700/40 rounded-xl p-3 transition-all cursor-pointer border border-transparent hover:border-slate-600/50 fade-in" @click="loadHistory(item); historyOpen = false" :title="item.expression + ' = ' + item.result">
+              <div class="flex items-start justify-between gap-2">
+                <div class="flex-1 min-w-0">
+                  <template x-if="editingId !== item.id">
+                    <div>
+                      <div class="text-slate-400 text-xs truncate" x-text="item.expression"></div>
+                      <div class="text-white text-base font-medium mt-0.5 truncate" x-text="'= ' + withCommas(item.result)"></div>
+                    </div>
+                  </template>
+                  <template x-if="editingId === item.id">
+                    <div class="flex gap-2" @click.stop>
+                      <input type="text" x-model="editText" @keydown.enter="saveEdit(item.id)" @keydown.escape="cancelEdit()" class="flex-1 bg-slate-700/60 rounded-lg px-2 py-1 text-sm text-white border border-amber-500/50 focus:outline-none focus:border-amber-400">
+                      <button @click="saveEdit(item.id)" class="text-amber-400 hover:text-amber-300 text-xs px-1">确定</button>
+                      <button @click="cancelEdit()" class="text-slate-500 hover:text-slate-300 text-xs px-1">取消</button>
+                    </div>
+                  </template>
+                </div>
+                <div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button @click.stop="startEdit(item)" class="p-1.5 rounded-lg hover:bg-slate-600/50 text-slate-500 hover:text-amber-400 transition-colors" title="编辑">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                  </button>
+                  <button @click.stop="deleteHistory(item.id)" class="p-1.5 rounded-lg hover:bg-slate-600/50 text-slate-500 hover:text-red-400 transition-colors" title="删除">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </template>
+          <template x-if="history.length === 0">
+            <div class="text-center text-slate-600 text-sm py-8">暂无记录</div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <script>
+    document.addEventListener('alpine:init', () => {
+      Alpine.data('calculator', () => ({
+        display: '0',
+        expressionDisplay: '',
+        firstOperand: null,
+        firstOperandStr: '',
+        operator: null,
+        waitingForSecondOperand: false,
+        justEvaluated: false,
+
+        history: [],
+        historyOpen: false,
+        editingId: null,
+        editText: '',
+
+        buttonRows: [
+          [
+            { label: 'C', action: 'clear' },
+            { label: '←', action: 'backspace' },
+            { label: '%', action: 'percent' },
+            { label: '÷', action: 'operator', value: '÷' }
+          ],
+          [
+            { label: '7', action: 'number' },
+            { label: '8', action: 'number' },
+            { label: '9', action: 'number' },
+            { label: '×', action: 'operator', value: '×' }
+          ],
+          [
+            { label: '4', action: 'number' },
+            { label: '5', action: 'number' },
+            { label: '6', action: 'number' },
+            { label: '−', action: 'operator', value: '-' }
+          ],
+          [
+            { label: '1', action: 'number' },
+            { label: '2', action: 'number' },
+            { label: '3', action: 'number' },
+            { label: '+', action: 'operator', value: '+' }
+          ],
+          [
+            { label: '±', action: 'negate' },
+            { label: '0', action: 'number' },
+            { label: '.', action: 'decimal' },
+            { label: '=', action: 'calculate' }
+          ]
+        ],
+
+        get displayClass() {
+          const len = this.formattedDisplay.length;
+          if (len <= 13) return 'text-4xl sm:text-5xl';
+          if (len <= 18) return 'text-3xl sm:text-4xl';
+          if (len <= 23) return 'text-2xl sm:text-3xl';
+          if (len <= 28) return 'text-xl sm:text-2xl';
+          return 'text-base sm:text-lg';
+        },
+
+        get formattedDisplay() {
+          if (this.display === 'Error') return 'Error';
+          return this.withCommas(this.display);
+        },
+
+        withCommas(s) {
+          let parts = s.split('.');
+          let intPart = parts[0];
+          let sign = '';
+          if (intPart.startsWith('-')) { sign = '-'; intPart = intPart.slice(1); }
+          intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+          return sign + intPart + (parts.length > 1 ? '.' + parts[1] : '');
+        },
+
+        get expressionClass() {
+          const len = this.expressionDisplay.length;
+          if (len <= 25) return 'text-sm sm:text-base';
+          if (len <= 40) return 'text-xs sm:text-sm';
+          return 'text-[10px] sm:text-xs';
+        },
+
+        init() {
+          Decimal.set({ precision: 50, rounding: Decimal.ROUND_HALF_UP });
+          try {
+            const saved = localStorage.getItem('calcHistory');
+            if (saved) this.history = JSON.parse(saved);
+          } catch (e) {}
+          this.$watch('history', () => {
+            try {
+              localStorage.setItem('calcHistory', JSON.stringify(this.history));
+            } catch (e) {}
+          });
+        },
+
+        press(btn) {
+          switch (btn.action) {
+            case 'number': this.inputDigit(btn.label); break;
+            case 'operator': this.handleOperator(btn.value); break;
+            case 'calculate': this.calculate(); break;
+            case 'clear': this.clearAll(); break;
+            case 'backspace': this.backspace(); break;
+            case 'percent': this.percent(); break;
+            case 'negate': this.negate(); break;
+            case 'decimal': this.inputDecimal(); break;
+          }
+        },
+
+        inputDigit(digit) {
+          if (this.display === 'Error') { this.clearAll(); }
+          if (this.justEvaluated) {
+            this.display = digit;
+            this.justEvaluated = false;
+            return;
+          }
+          if (this.waitingForSecondOperand) {
+            this.display = digit;
+            this.waitingForSecondOperand = false;
+          } else {
+            let digits = this.display.replace(/[^0-9]/g, '');
+            if (digits.length >= 40 && this.display !== '0') return;
+            this.display = this.display === '0' ? digit : this.display + digit;
+          }
+        },
+
+        inputDecimal() {
+          if (this.display === 'Error') { this.clearAll(); }
+          if (this.justEvaluated) {
+            this.display = '0.';
+            this.justEvaluated = false;
+            return;
+          }
+          if (this.waitingForSecondOperand) {
+            this.display = '0.';
+            this.waitingForSecondOperand = false;
+          } else if (!this.display.includes('.')) {
+            this.display += '.';
+          }
+        },
+
+        handleOperator(nextOp) {
+          if (this.display === 'Error') return;
+          let current;
+          try { current = new Decimal(this.display); } catch(e) { return; }
+
+          if (this.operator && !this.waitingForSecondOperand) {
+            let result = this.compute(this.firstOperand, this.operator, current);
+            if (result === 'Error') { this.display = 'Error'; return; }
+            this.display = this.formatNumber(result);
+            this.firstOperand = result;
+            this.firstOperandStr = this.display;
+          } else {
+            this.firstOperand = current;
+            this.firstOperandStr = this.display;
+          }
+          let nextOpSymbol = this.opSymbol(nextOp);
+          this.operator = nextOp;
+          this.waitingForSecondOperand = true;
+          this.expressionDisplay = this.firstOperandStr + ' ' + nextOpSymbol;
+        },
+
+        calculate() {
+          if (this.display === 'Error') return;
+          if (this.operator === null) {
+            this.expressionDisplay = this.display + ' =';
+            return;
+          }
+          let current;
+          try { current = new Decimal(this.display); } catch(e) { return; }
+          let result = this.compute(this.firstOperand, this.operator, current);
+          if (result === 'Error') { this.display = 'Error'; return; }
+          const expr = this.firstOperandStr + ' ' + this.opSymbol(this.operator) + ' ' + this.display;
+          const res = this.formatNumber(result);
+          this.expressionDisplay = expr + ' =';
+          this.display = res;
+          this.addHistory(expr, res);
+          this.operator = null;
+          this.firstOperand = null;
+          this.waitingForSecondOperand = false;
+          this.justEvaluated = true;
+        },
+
+        compute(a, op, b) {
+          if (a === null || a === undefined) a = new Decimal(0);
+          try {
+            switch (op) {
+              case '+': return a.plus(b);
+              case '-': return a.minus(b);
+              case '×': return a.times(b);
+              case '÷': return b.isZero() ? 'Error' : a.div(b);
+              default: return 'Error';
+            }
+          } catch(e) { return 'Error'; }
+        },
+
+        clearAll() {
+          this.display = '0';
+          this.expressionDisplay = '';
+          this.firstOperand = null;
+          this.firstOperandStr = '';
+          this.operator = null;
+          this.waitingForSecondOperand = false;
+          this.justEvaluated = false;
+        },
+
+        backspace() {
+          if (this.display === 'Error') { this.clearAll(); return; }
+          if (this.waitingForSecondOperand || this.justEvaluated) return;
+          this.display = this.display.length > 1 ? this.display.slice(0, -1) : '0';
+        },
+
+        percent() {
+          if (this.display === 'Error') return;
+          let val;
+          try { val = new Decimal(this.display); } catch(e) { return; }
+          this.display = this.formatNumber(val.div(100));
+        },
+
+        negate() {
+          if (this.display === 'Error' || this.display === '0') return;
+          this.display = this.display.startsWith('-') ? this.display.slice(1) : '-' + this.display;
+        },
+
+        // History
+        addHistory(expr, result) {
+          this.history.unshift({
+            id: Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+            expression: expr,
+            result: result,
+            timestamp: Date.now()
+          });
+          if (this.history.length > 100) this.history.pop();
+        },
+
+        loadHistory(item) {
+          this.display = item.result;
+          this.expressionDisplay = '';
+          this.firstOperand = null;
+          this.firstOperandStr = '';
+          this.operator = null;
+          this.waitingForSecondOperand = false;
+          this.justEvaluated = false;
+        },
+
+        startEdit(item) {
+          this.editingId = item.id;
+          this.editText = item.expression;
+        },
+
+        saveEdit(id) {
+          const result = this.evaluateExpression(this.editText);
+          const idx = this.history.findIndex(h => h.id === id);
+          if (idx !== -1) {
+            this.history[idx].expression = this.editText;
+            this.history[idx].result = result;
+          }
+          this.editingId = null;
+          this.editText = '';
+        },
+
+        cancelEdit() {
+          this.editingId = null;
+          this.editText = '';
+        },
+
+        deleteHistory(id) {
+          this.history = this.history.filter(h => h.id !== id);
+        },
+
+        clearHistory() {
+          this.history = [];
+        },
+
+        evaluateExpression(expr) {
+          let s = expr.replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-');
+          const tokens = [];
+          let numStr = '';
+          let lastWasOp = true;
+          for (let i = 0; i < s.length; i++) {
+            const ch = s[i];
+            if (ch === ' ') continue;
+            if (/[0-9.]/.test(ch)) { numStr += ch; lastWasOp = false; }
+            else if ('+-*/%'.includes(ch)) {
+              if (numStr) { tokens.push(numStr); numStr = ''; }
+              if (ch === '-' && (lastWasOp || tokens.length === 0)) { numStr = '-'; continue; }
+              tokens.push(ch);
+              lastWasOp = true;
+            }
+            else return 'Error';
+          }
+          if (numStr) tokens.push(numStr);
+          if (tokens.length < 1) return 'Error';
+          let result;
+          try { result = new Decimal(tokens[0]); } catch(e) { return 'Error'; }
+          for (let i = 1; i < tokens.length; i += 2) {
+            const op = tokens[i];
+            let num;
+            try { num = new Decimal(tokens[i + 1]); } catch(e) { return 'Error'; }
+            try {
+              switch (op) {
+                case '+': result = result.plus(num); break;
+                case '-': result = result.minus(num); break;
+                case '*': result = result.times(num); break;
+                case '/': result = num.isZero() ? 'Error' : result.div(num); break;
+                case '%': result = result.mod(num); break;
+              }
+            } catch(e) { return 'Error'; }
+            if (result === 'Error' || !result.isFinite()) return 'Error';
+          }
+          return this.formatNumber(result);
+        },
+
+        // Formatting
+        formatNumber(n) {
+          if (n === 'Error') return 'Error';
+          if (n instanceof Decimal) {
+            if (!n.isFinite()) return 'Error';
+            let s = n.toFixed(10).replace(/\.?0+$/, '');
+            return s === '' ? '0' : s;
+          }
+          if (!isFinite(n)) return 'Error';
+          let r = Number.isInteger(n) ? n : Math.round(n * 1e10) / 1e10;
+          return this.decimalString(r);
+        },
+
+        formatOperand(n) {
+          if (n === null || n === undefined) return '0';
+          return this.decimalString(n);
+        },
+
+        decimalString(n) {
+          let s = String(n);
+          let ei = s.indexOf('e');
+          if (ei === -1) return s;
+          let mantissa = s.slice(0, ei);
+          let exp = parseInt(s.slice(ei + 1));
+          let sign = mantissa.startsWith('-') ? '-' : '';
+          let digits = mantissa.replace(/[.-]/g, '');
+          let dotPos = mantissa.indexOf('.');
+          let absDotPos = dotPos === -1 ? digits.length : dotPos - (sign ? 1 : 0);
+          let newPos = absDotPos + exp;
+          if (newPos <= 0) return sign + '0.' + '0'.repeat(-newPos) + digits;
+          if (newPos >= digits.length) return sign + digits + '0'.repeat(newPos - digits.length);
+          return sign + digits.slice(0, newPos) + '.' + digits.slice(newPos);
+        },
+
+        opSymbol(op) {
+          const map = { '+': '+', '-': '−', '×': '×', '÷': '÷' };
+          return map[op] || op;
+        },
+
+        // Keyboard
+        handleKeydown(e) {
+          if (e.ctrlKey || e.metaKey || e.altKey) return;
+          if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+          const key = e.key;
+          if (/^[0-9]$/.test(key)) { e.preventDefault(); this.inputDigit(key); return; }
+          if (key === '.') { e.preventDefault(); this.inputDecimal(); return; }
+          if (key === '+') { e.preventDefault(); this.handleOperator('+'); return; }
+          if (key === '-') { e.preventDefault(); this.handleOperator('-'); return; }
+          if (key === '*') { e.preventDefault(); this.handleOperator('×'); return; }
+          if (key === '/') { e.preventDefault(); this.handleOperator('÷'); return; }
+          if (key === '%') { e.preventDefault(); this.percent(); return; }
+          if (key === 'Enter' || key === '=') { e.preventDefault(); this.calculate(); return; }
+          if (key === 'Backspace') { e.preventDefault(); this.backspace(); return; }
+          if (key === 'Escape') { e.preventDefault(); this.clearAll(); return; }
+          if (key === 'Delete') { e.preventDefault(); this.clearAll(); return; }
+        }
+      }));
+    });
+  </script>
+
+</body>
+</html>
