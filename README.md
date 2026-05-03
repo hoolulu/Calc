@@ -1,6 +1,6 @@
 # Hoolulu Calc v1.0
 
-一个简洁、美观、全平台可用的计算器 PWA。单 HTML 文件，零依赖部署。
+一个简洁、美观、全平台可用的计算器。单 HTML 文件，零依赖部署。
 
 > 🖥️ 演示站点：[https://js.p55.top](https://js.p55.top)
 
